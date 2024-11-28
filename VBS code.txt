@@ -1,0 +1,105 @@
+Sub StoreValueUnderTime()
+    Dim ws As Worksheet
+    Dim sourceWs As Worksheet
+    Dim sourceWorkbook As Workbook
+    Dim groupHeader As Range
+    Dim foundTime As Range
+    Dim timesToCheck As Variant
+    Dim sourceRow As Long
+    Dim emColumn As Long
+    Dim monthValue As Integer
+    Dim yearValue As Integer
+    Dim groupHeaderValue As Integer
+    Dim i As Long
+    Dim j As Long
+    Dim emTag As String
+    Dim destTag As String
+    Dim destRow As Long
+    Dim lastSourceRow As Long
+
+    ' Set the worksheet for destination
+    Set ws = ThisWorkbook.Sheets("Sheet1")  ' Change "Sheet1" to your actual destination sheet name
+
+    ' Open the source workbook and set the worksheet
+    Set sourceWorkbook = Workbooks.Open("D:\Electroservo\Project1\Testing\Testing3.xlsx")
+    Set sourceWs = sourceWorkbook.Sheets("Sheet1") ' Change "Sheet1" to your actual source sheet name
+
+    ' Read the month and year from cells (2, K) and (2, L)
+    monthValue = ws.Cells(2, 11).Value  ' Column K
+    yearValue = ws.Cells(2, 12).Value   ' Column L
+
+    ' Define the specific times to check (6 AM, 2 PM, and 10 PM)
+    timesToCheck = Array("6:00 AM", "2:00 PM", "10:00 PM")
+
+    ' Determine the last row in the source worksheet based on the second column
+    lastSourceRow = sourceWs.Cells(sourceWs.Rows.Count, 2).End(xlUp).Row
+
+    ' Loop through EM columns from 3 to 28
+    For emColumn = 3 To 28
+        ' Read the tag from the 7th row of the source worksheet
+        emTag = Trim(sourceWs.Cells(7, emColumn).Value)
+
+        ' Check if the tag matches the expected format (e.g., "EM-01", "EM-12")
+        If emTag Like "EM-0#" Or emTag Like "EM-1#" Then
+
+            ' Loop through destination rows from 6 to 29
+            For destRow = 6 To 29
+                destTag = Trim(ws.Cells(destRow, 1).Value)
+
+                ' Display emTag and destTag before the comparison
+                ' MsgBox "Source EM Tag: " & emTag & vbCrLf & "Destination EM Tag: " & destTag, vbInformation, "Tag Comparison"
+
+                ' Compare the source tag with the destination tag
+                If emTag = destTag Then
+                    ' Display matching tag names
+                    ' MsgBox "Matching Tags Found!" & vbCrLf & _
+                          ' "Source EM Tag: " & emTag & vbCrLf & _
+                          ' "Destination EM Tag: " & destTag, vbInformation, "Tag Match"
+
+                    ' Loop through each group header (1 to 31)
+                    For groupHeaderValue = 1 To 31
+                        ' Find the header for the specified group
+                        Set groupHeader = ws.Rows(4).Find(What:=groupHeaderValue, LookIn:=xlValues, LookAt:=xlWhole)
+
+                        If Not groupHeader Is Nothing Then
+                            ' Check all columns under the group header for the specified times
+                            For i = groupHeader.Column To groupHeader.Column + 2 ' Adjust to check the next two columns as well
+                                ' Highlight the time values in the current column
+                                For j = LBound(timesToCheck) To UBound(timesToCheck)
+                                    ' Find the specified time in the current column
+                                    Set foundTime = ws.Columns(i).Find(What:=timesToCheck(j), LookIn:=xlValues, LookAt:=xlWhole)
+
+                                    If Not foundTime Is Nothing Then
+                                        ' Check the source timestamps against the specified date and time
+                                        For sourceRow = 9 To lastSourceRow - 1 ' Use the lastSourceRow determined above
+                                            ' Ensure the cell contains a valid date
+                                            If IsDate(sourceWs.Cells(sourceRow, 2).Value) Then
+                                                If Year(sourceWs.Cells(sourceRow, 2).Value) = yearValue And _
+                                                   Month(sourceWs.Cells(sourceRow, 2).Value) = monthValue And _
+                                                   Day(sourceWs.Cells(sourceRow, 2).Value) = groupHeaderValue And _
+                                                   TimeValue(sourceWs.Cells(sourceRow, 2).Value) = TimeValue(timesToCheck(j)) Then
+                                                    sourceWs.Cells(sourceRow, 2).Interior.Color = RGB(255, 228, 196) ' Highlight matched timestamp
+
+                                                    ' Transfer the KWh value to the destination worksheet
+                                                    ws.Cells(destRow, i).Value = sourceWs.Cells(sourceRow, emColumn).Value ' Transfer the KWh value
+
+                                                    Exit For ' Exit inner loop after storing the value
+                                                End If
+                                            End If
+                                        Next sourceRow
+                                        
+                                        Exit For ' Exit outer loop after processing the current time
+                                    End If
+                                Next j
+                            Next i
+                        End If
+                    Next groupHeaderValue
+                    Exit For ' Exit the loop after processing the matched destination tag
+                End If
+            Next destRow
+        End If
+    Next emColumn
+
+    ' Close the source workbook without saving changes
+    ' sourceWorkbook.Close SaveChanges:=False
+End Sub
